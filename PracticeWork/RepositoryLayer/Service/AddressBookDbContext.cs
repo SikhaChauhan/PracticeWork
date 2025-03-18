@@ -3,9 +3,9 @@ using ModelLayer.Model;
 
 namespace RepositoryLayer.Service
 {
-    public class AddressBookDbContext : DbContext 
+    public class AddressBookDBContext : DbContext 
     {
-        public AddressBookDbContext(DbContextOptions<AddressBookDbContext> options) : base(options)
+        public AddressBookDBContext(DbContextOptions<AddressBookDBContext> options) : base(options)
         {
         }
 
