@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ModelLayer.DTO
 {
-    public class UserDTO
+    public class UserRegisterDTO
     {
         public int Id { get; set; }
         public string Email { get; set; }
