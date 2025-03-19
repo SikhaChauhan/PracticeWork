@@ -14,7 +14,7 @@ namespace BusinessLayer.Service
             _addressBookRL = addressBookRL;
         }
 
-        // Fetch all contacts
+        // Fetch all contacts from the AddressBook
         public async Task<IEnumerable<AddressBookDTO>> GetAllContactsAsync()
         {
             var contacts = await _addressBookRL.GetAllAsync();
@@ -28,7 +28,7 @@ namespace BusinessLayer.Service
             });
         }
 
-        // Fetch a contact by ID
+        // Fetch a contact by Id
         public async Task<AddressBookDTO?> GetContactByIdAsync(int id)
         {
             var contact = await _addressBookRL.GetByIdAsync(id);
