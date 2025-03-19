@@ -13,6 +13,8 @@ builder.Services.AddDbContext<AddressBookDBContext>(options =>
 // Add services to the container.
 builder.Services.AddScoped<IAddressBookRL, AddressBookRL>();
 builder.Services.AddScoped<IAddressBookBL, AddressBookBL>();
+builder.Services.AddScoped<IAuthBL, AuthBL>();
+builder.Services.AddScoped<IUserRL, UserRL>();
 builder.Services.AddControllers();
 builder.Services.AddControllers();
 

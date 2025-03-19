@@ -25,5 +25,18 @@ namespace RepositoryLayer.Repository
             await _context.SaveChangesAsync();
             return user;
         }
+
+        public async Task<UserEntity?> LoginUserAsync(string email, string password)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null) return null; // User not found
+
+            // Verify the password using BCrypt
+            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(password.Trim(), user.PasswordHash);
+            if (!isPasswordValid) return null; // Invalid password
+
+            return user; // Return user if authenticated
+        }
+
     }
 }
