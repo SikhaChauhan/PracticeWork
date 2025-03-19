@@ -1,18 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ModelLayer.Model;
+﻿using ModelLayer.DTO;
+
 
 namespace BusinessLayer.Interface
 {
     public interface IAddressBookBL
     {
-        Task<IEnumerable<AddressBookEntity>> GetAllContactsAsync();
-        Task<AddressBookEntity?> GetContactByIdAsync(int id);
-        Task<AddressBookEntity> AddContactAsync(AddressBookEntity contact);
-        Task<AddressBookEntity?> UpdateContactAsync(int id, AddressBookEntity updatedContact);
+        Task<IEnumerable<AddressBookDTO>> GetAllContactsAsync();
+        Task<AddressBookDTO?> GetContactByIdAsync(int id);
+        Task<AddressBookDTO> CreateContactAsync(AddressBookDTO contactDto);
+        Task<AddressBookDTO?> UpdateContactAsync(int id, AddressBookDTO contactDto);
         Task<bool> DeleteContactAsync(int id);
     }
 }

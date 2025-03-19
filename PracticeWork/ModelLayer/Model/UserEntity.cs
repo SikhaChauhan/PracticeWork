@@ -7,17 +7,19 @@ using System.Threading.Tasks;
 
 namespace ModelLayer.Model
 {
-    public class AddressBookEntity
+    //User entity created
+    public class UserEntity
     {
         [Key]
         public int Id { get; set; }
+
         [Required]
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; }
+
         [Required]
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; set; }
+
         [Required]
-        public string PhoneNumber { get; set; } = string.Empty;
-        [Required]
-        public string Address { get; set; } = string.Empty;
+        public string PasswordHash { get; set; }
     }
 }

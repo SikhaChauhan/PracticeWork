@@ -1,63 +1,64 @@
 using BusinessLayer.Interface;
 using Microsoft.AspNetCore.Mvc;
-using ModelLayer.Model;
+using ModelLayer.DTO;
 
 namespace ControllerLayer.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class AddressBookController : ControllerBase
     {
-        private readonly IAddressBookBL _addressBookService;
+        private readonly IAddressBookBL _addressBookBL;
 
-        public AddressBookController(IAddressBookBL addressBookService)
+        public AddressBookController(IAddressBookBL addressBookBL)
         {
-            _addressBookService = addressBookService;
+            _addressBookBL = addressBookBL;
         }
 
+        // GET: api/addressbook
         [HttpGet]
         public async Task<IActionResult> GetAllContacts()
         {
-            var contacts = await _addressBookService.GetAllContactsAsync();
+            var contacts = await _addressBookBL.GetAllContactsAsync();
             return Ok(contacts);
         }
 
+        // GET: api/addressbook/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetContactById(int id)
         {
-            var contact = await _addressBookService.GetContactByIdAsync(id);
-            if (contact == null) return NotFound("Contact not found.");
+            var contact = await _addressBookBL.GetContactByIdAsync(id);
+            if (contact == null) return NotFound(new { message = "Contact not found" });
+
             return Ok(contact);
         }
 
+        // POST: api/addressbook
         [HttpPost]
-        public async Task<IActionResult> CreateContact([FromBody] AddressBookEntity contact)
+        public async Task<IActionResult> CreateContact([FromBody] AddressBookDTO contactDto)
         {
-            try
-            {
-                var newContact = await _addressBookService.AddContactAsync(contact);
-                return CreatedAtAction(nameof(GetContactById), new { id = newContact.Id }, newContact);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var newContact = await _addressBookBL.CreateContactAsync(contactDto);
+            return CreatedAtAction(nameof(GetContactById), new { id = newContact.Id }, newContact);
         }
 
+        // PUT: api/addressbook/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateContact(int id, [FromBody] AddressBookEntity contact)
+        public async Task<IActionResult> UpdateContact(int id, [FromBody] AddressBookDTO contactDto)
         {
-            var updatedContact = await _addressBookService.UpdateContactAsync(id, contact);
-            if (updatedContact == null) return NotFound("Contact not found.");
+            var updatedContact = await _addressBookBL.UpdateContactAsync(id, contactDto);
+            if (updatedContact == null) return NotFound(new { message = "Contact not found" });
+
             return Ok(updatedContact);
         }
 
+        // DELETE: api/addressbook/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteContact(int id)
         {
-            var isDeleted = await _addressBookService.DeleteContactAsync(id);
-            if (!isDeleted) return NotFound("Contact not found.");
-            return Ok("Contact deleted successfully.");
+            var isDeleted = await _addressBookBL.DeleteContactAsync(id);
+            if (!isDeleted) return NotFound(new { message = "Contact not found" });
+
+            return NoContent();
         }
     }
 }
