@@ -14,11 +14,13 @@ namespace RepositoryLayer.Repository
             _context = context;
         }
 
+        // Get User by Email
         public async Task<UserEntity?> GetUserByEmailAsync(string email)
         {
             return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
         }
 
+        // Register User
         public async Task<UserEntity> RegisterUserAsync(UserEntity user)
         {
             _context.Users.Add(user);
@@ -26,6 +28,7 @@ namespace RepositoryLayer.Repository
             return user;
         }
 
+        // Login User (Validate credentials)
         public async Task<UserEntity?> LoginUserAsync(string email, string password)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
@@ -38,5 +41,26 @@ namespace RepositoryLayer.Repository
             return user; // Return user if authenticated
         }
 
+        // Update User
+        public async Task UpdateUserAsync(UserEntity user)
+        {
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+        }
+
+        // Save Password Reset Token
+        public async Task SavePasswordResetTokenAsync(UserEntity user, string resetToken)
+        {
+            user.ResetToken = resetToken;
+            user.ResetTokenExpiry = DateTime.UtcNow.AddHours(1); // Token expires in 1 hour
+            await UpdateUserAsync(user);
+        }
+
+        // Get User by Reset Token
+        public async Task<UserEntity?> GetUserByResetTokenAsync(string resetToken)
+        {
+            return await _context.Users.FirstOrDefaultAsync(u =>
+                u.ResetToken == resetToken && u.ResetTokenExpiry > DateTime.UtcNow);
+        }
     }
 }

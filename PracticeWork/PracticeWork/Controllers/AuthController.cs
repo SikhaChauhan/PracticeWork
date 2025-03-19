@@ -33,4 +33,26 @@ public class AuthController : ControllerBase
 
         return Ok(new { Token = token });
     }
+
+    // POST: /api/auth/forgot-password
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO model)
+    {
+        if (model == null || string.IsNullOrEmpty(model.Email))
+            return BadRequest("Email is required.");
+
+        var result = await _authBL.ForgotPasswordAsync(model.Email);
+        return Ok(new { message = result });
+    }
+
+    // POST: /api/auth/reset-password
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO model)
+    {
+        if (model == null || string.IsNullOrEmpty(model.Token) || string.IsNullOrEmpty(model.NewPassword))
+            return BadRequest("Token and new password are required.");
+
+        var result = await _authBL.ResetPasswordAsync(model.Token, model.NewPassword);
+        return Ok(new { message = result });
+    }
 }
