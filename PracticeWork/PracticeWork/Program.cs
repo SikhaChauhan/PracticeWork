@@ -51,6 +51,7 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Configure the HTTP Request Pipeline
+//Swagger has been added
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
