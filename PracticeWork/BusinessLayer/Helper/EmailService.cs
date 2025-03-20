@@ -1,17 +1,20 @@
 ﻿// EmailService.cs
 using Microsoft.Extensions.Configuration;
 
-public class EmailService
+namespace BusinessLayer.Helper
 {
-    private readonly IConfiguration _configuration;
-
-    public EmailService(IConfiguration configuration)
+    public class EmailService
     {
-        _configuration = configuration;
-    }
+        private readonly IConfiguration _configuration;
 
-    public async Task SendEmailAsync(string to, string subject, string body)
-    {
-        // Email sending logic here (e.g., using SMTP)
+        public EmailService(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        public async Task SendEmailAsync(string to, string subject, string body)
+        {
+            // Email sending logic here (e.g., using SMTP)
+        }
     }
 }

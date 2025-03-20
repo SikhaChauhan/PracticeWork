@@ -1,9 +1,9 @@
-﻿using BussinessLayer.Interface;
+﻿using BusinessLayer.Interface;
 using Microsoft.AspNetCore.Mvc;
 using ModelLayer.DTO;
 using ModelLayer.Model;
 
-namespace AddressBookApp.Controllers
+namespace Prac.Controllers
 {
     [Route("api/auth")]
     [ApiController]

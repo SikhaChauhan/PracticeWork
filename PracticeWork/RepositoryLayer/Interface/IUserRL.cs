@@ -1,4 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using ModelLayer.Model;
 
 namespace RepositoryLayer.Interface
@@ -7,7 +11,9 @@ namespace RepositoryLayer.Interface
     {
         Task<UserEntity> RegisterUser(UserEntity user);
         Task<UserEntity> GetUserByEmail(string email);
-        Task<UserEntity> GetUserByResetToken(string Token);
+
+        Task<UserEntity> GetUserByResetToken(string resetToken);
+
         Task UpdateUser(UserEntity user);
     }
 }

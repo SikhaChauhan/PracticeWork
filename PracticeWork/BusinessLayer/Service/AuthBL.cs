@@ -2,18 +2,19 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
-using BussinessLayer.Helper;
-using BussinessLayer.Interface;
-using Microsoft.AspNetCore.Identity;
+using BusinessLayer.Helper;
+using BusinessLayer.Interface;
 using Microsoft.Extensions.Configuration;
 using ModelLayer.DTO;
 using ModelLayer.Model;
+using RabbitMQ.Client;
 using RepositoryLayer.Interface;
 using RepositoryLayer.Service;
 using StackExchange.Redis;
 
-namespace BussinessLayer.Service
+namespace BusinessLayer.Service
 {
     public class AuthBL : IAuthBL
     {
@@ -22,24 +23,26 @@ namespace BussinessLayer.Service
         private readonly EmailService _emailService;
         private readonly IDatabase _cache;
         private readonly TimeSpan _cacheExpiration;
+        private readonly IConnection _rabbitMqConnection;
 
-        public AuthBL(IUserRL userRepository, JwtTokenGenerator jwtTokenGenerator, EmailService emailService, IConnectionMultiplexer redis, IConfiguration config)
+        public AuthBL(IUserRL userRepository, JwtTokenGenerator jwtTokenGenerator, EmailService emailService, IConnectionMultiplexer redis, IConfiguration config, IConnection rabbitMqConnection)
         {
             _userRepository = userRepository;
             _jwtTokenGenerator = jwtTokenGenerator;
             _emailService = emailService;
             _cache = redis.GetDatabase();
             _cacheExpiration = TimeSpan.FromMinutes(int.Parse(config["Redis:CacheExpirationMinutes"] ?? "10"));
+            _rabbitMqConnection = rabbitMqConnection;
         }
 
-        public async Task<UserEntity> Register(UserRegisterDTO userregisterDTO)
+        public async Task<UserEntity> Register(UserRegisterDTO userDTO)
         {
-            var hashedPassword = PasswordHasher.HashPassword(userregisterDTO.Password);
+            var hashedPassword = PasswordHasher.HashPassword(userDTO.Password);
             var user = new UserEntity
             {
-                Email = userregisterDTO.Email,
+                Email = userDTO.Email,
                 PasswordHash = hashedPassword,
-                Name = userregisterDTO.Name
+                Name = userDTO.Name
             };
 
             var registeredUser = await _userRepository.RegisterUser(user);
@@ -47,14 +50,18 @@ namespace BussinessLayer.Service
             // Cache user data
             await _cache.StringSetAsync($"user:{registeredUser.Email}", System.Text.Json.JsonSerializer.Serialize(registeredUser), _cacheExpiration);
 
+            // Publish user registration event to RabbitMQ
+            PublishMessage("UserRegisteredQueue", new { Email = registeredUser.Email, Name = registeredUser.Name });
+
+
             return registeredUser;
 
 
         }
 
-        public async Task<string> Login(UserLoginDTO userloginDTO)
+        public async Task<string> Login(UserLoginDTO userDTO)
         {
-            string cacheKey = $"user:{userloginDTO.Email}";
+            string cacheKey = $"user:{userDTO.Email}";
 
             // Try getting the user from cache
             var cachedUser = await _cache.StringGetAsync(cacheKey);
@@ -67,14 +74,14 @@ namespace BussinessLayer.Service
             else
             {
                 // Fetch from DB if not in cache
-                user = await _userRepository.GetUserByEmail(userloginDTO.Email);
+                user = await _userRepository.GetUserByEmail(userDTO.Email);
                 if (user != null)
                 {
                     await _cache.StringSetAsync(cacheKey, System.Text.Json.JsonSerializer.Serialize(user), _cacheExpiration);
                 }
             }
 
-            if (user == null || !PasswordHasher.VerifyPassword(userloginDTO.Password, user.PasswordHash))
+            if (user == null || !PasswordHasher.VerifyPassword(userDTO.Password, user.PasswordHash))
             {
                 return null; // Invalid credentials
             }
@@ -131,6 +138,16 @@ namespace BussinessLayer.Service
             await _cache.KeyDeleteAsync($"user:{user.Email}");
 
             return true;
+        }
+
+
+        public void PublishMessage<T>(string routingKey, T message)
+        {
+            using var channel = _rabbitMqConnection.CreateModel();
+            channel.ExchangeDeclare("events", ExchangeType.Topic);
+
+            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
+            channel.BasicPublish(exchange: "events", routingKey: routingKey, body: body);
         }
     }
 }

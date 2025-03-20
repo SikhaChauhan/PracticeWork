@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
-namespace BussinessLayer.Helper
+namespace BusinessLayer.Helper
 {
     public class JwtTokenGenerator
     {

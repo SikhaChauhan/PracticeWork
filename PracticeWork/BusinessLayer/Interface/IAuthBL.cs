@@ -6,12 +6,13 @@ using System.Threading.Tasks;
 using ModelLayer.DTO;
 using ModelLayer.Model;
 
-namespace BussinessLayer.Interface
+namespace BusinessLayer.Interface
 {
     public interface IAuthBL
     {
-        Task<UserEntity> Register(UserRegisterDTO userDTO);
-        Task<string> Login(UserLoginDTO userDTO);
+        Task<UserEntity> Register(UserRegisterDTO userregisterDTO);
+        Task<string> Login(UserLoginDTO userloginDTO);
+
         Task<bool> ForgotPassword(ForgotPasswordDTO forgotPasswordDTO);
         Task<bool> ResetPassword(ResetPasswordDTO resetPasswordDTO);
     }
