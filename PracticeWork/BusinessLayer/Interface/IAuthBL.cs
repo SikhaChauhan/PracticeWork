@@ -1,12 +1,18 @@
-﻿using ModelLayer.DTO;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using ModelLayer.DTO;
+using ModelLayer.Model;
 
-namespace BusinessLayer.Interface
+namespace BussinessLayer.Interface
 {
     public interface IAuthBL
     {
-        Task<string?> RegisterUserAsync(UserRegisterDTO userDto);
-        Task<string?> LoginUserAsync(UserLoginDTO loginDto);
-        Task<string> ForgotPasswordAsync(string email);
-        Task<bool> ResetPasswordAsync(string resetToken, string newPassword);
+        Task<UserEntity> Register(UserRegisterDTO userDTO);
+        Task<string> Login(UserLoginDTO userDTO);
+        Task<bool> ForgotPassword(ForgotPasswordDTO forgotPasswordDTO);
+        Task<bool> ResetPassword(ResetPasswordDTO resetPasswordDTO);
     }
 }

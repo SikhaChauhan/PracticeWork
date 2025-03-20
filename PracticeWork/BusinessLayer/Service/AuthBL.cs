@@ -1,189 +1,136 @@
-﻿using BusinessLayer.Interface;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using BussinessLayer.Helper;
+using BussinessLayer.Interface;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
 using ModelLayer.DTO;
 using ModelLayer.Model;
 using RepositoryLayer.Interface;
-using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
+using RepositoryLayer.Service;
+using StackExchange.Redis;
 
-namespace BusinessLayer.Service
+namespace BussinessLayer.Service
 {
     public class AuthBL : IAuthBL
     {
-        private readonly IUserRL _userRL;
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<AuthBL> _logger;
+        private readonly IUserRL _userRepository;
+        private readonly JwtTokenGenerator _jwtTokenGenerator;
+        private readonly EmailService _emailService;
+        private readonly IDatabase _cache;
+        private readonly TimeSpan _cacheExpiration;
 
-        public AuthBL(IUserRL userRL, IConfiguration configuration, ILogger<AuthBL> logger)
+        public AuthBL(IUserRL userRepository, JwtTokenGenerator jwtTokenGenerator, EmailService emailService, IConnectionMultiplexer redis, IConfiguration config)
         {
-            _userRL = userRL ?? throw new ArgumentNullException(nameof(userRL));
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _userRepository = userRepository;
+            _jwtTokenGenerator = jwtTokenGenerator;
+            _emailService = emailService;
+            _cache = redis.GetDatabase();
+            _cacheExpiration = TimeSpan.FromMinutes(int.Parse(config["Redis:CacheExpirationMinutes"] ?? "10"));
         }
 
-        // Registers a new user
-        public async Task<string?> RegisterUserAsync(UserRegisterDTO userDto)
+        public async Task<UserEntity> Register(UserRegisterDTO userregisterDTO)
         {
-            if (userDto == null) throw new ArgumentNullException(nameof(userDto));
-
-            try
+            var hashedPassword = PasswordHasher.HashPassword(userregisterDTO.Password);
+            var user = new UserEntity
             {
-                // Check if the user already exists
-                var existingUser = await _userRL.GetUserByEmailAsync(userDto.Email);
-                if (existingUser != null) return "User already exists.";
-
-                // Hash the password securely
-                var passwordHash = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
-
-                // Create a new user entity
-                var newUser = new UserEntity
-                {
-                    Name = userDto.Name,
-                    Email = userDto.Email,
-                    PasswordHash = passwordHash
-                };
-
-                // Save the user to the database
-                await _userRL.RegisterUserAsync(newUser);
-
-                // Generate and return JWT token
-                return GenerateJwtToken(newUser);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred during user registration.");
-                throw new InvalidOperationException("Registration failed.");
-            }
-        }
-
-        // Authenticates a user
-        public async Task<string?> LoginUserAsync(UserLoginDTO loginDto)
-        {
-            if (loginDto == null) throw new ArgumentNullException(nameof(loginDto));
-
-            try
-            {
-                var user = await _userRL.GetUserByEmailAsync(loginDto.Email);
-                if (user == null || !BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash))
-                {
-                    _logger.LogWarning("Invalid credentials for email: {Email}", loginDto.Email);
-                    return null; // Invalid credentials
-                }
-
-                return GenerateJwtToken(user); // Generate JWT token
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred during user login.");
-                throw new InvalidOperationException("Login failed.");
-            }
-        }
-
-        // Generates a JWT token for the authenticated user
-        private string GenerateJwtToken(UserEntity user)
-        {
-            if (user == null) throw new ArgumentNullException(nameof(user));
-            if (user.Id == null || IsInvalidUserId(user.Id)) throw new ArgumentException("Invalid user ID.");
-
-            try
-            {
-                var jwtKey = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is not configured.");
-                var jwtIssuer = _configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("Jwt:Issuer is not configured.");
-                var jwtAudience = _configuration["Jwt:Audience"] ?? throw new InvalidOperationException("Jwt:Audience is not configured.");
-
-                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-                var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-                var claims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                    new Claim(ClaimTypes.Email, user.Email),
-                    new Claim(ClaimTypes.Name, user.Name)
-                };
-
-                var token = new JwtSecurityToken(
-                    issuer: jwtIssuer,
-                    audience: jwtAudience,
-                    claims: claims,
-                    expires: DateTime.UtcNow.AddHours(2),
-                    signingCredentials: creds
-                );
-
-                return new JwtSecurityTokenHandler().WriteToken(token);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error generating JWT token.");
-                throw new InvalidOperationException("Token generation failed.");
-            }
-        }
-
-        // Helper method to validate the user ID
-        private bool IsInvalidUserId(object userId)
-        {
-            return userId switch
-            {
-                Guid guid => guid == Guid.Empty,
-                int id => id <= 0,
-                _ => true
+                Email = userregisterDTO.Email,
+                PasswordHash = hashedPassword,
+                Name = userregisterDTO.Name
             };
+
+            var registeredUser = await _userRepository.RegisterUser(user);
+
+            // Cache user data
+            await _cache.StringSetAsync($"user:{registeredUser.Email}", System.Text.Json.JsonSerializer.Serialize(registeredUser), _cacheExpiration);
+
+            return registeredUser;
+
+
         }
 
-        // Initiates password reset
-        public async Task<string> ForgotPasswordAsync(string email)
+        public async Task<string> Login(UserLoginDTO userloginDTO)
         {
-            if (string.IsNullOrEmpty(email)) throw new ArgumentNullException(nameof(email));
+            string cacheKey = $"user:{userloginDTO.Email}";
 
-            try
+            // Try getting the user from cache
+            var cachedUser = await _cache.StringGetAsync(cacheKey);
+            UserEntity user;
+
+            if (!cachedUser.IsNullOrEmpty)
             {
-                var user = await _userRL.GetUserByEmailAsync(email);
-                if (user == null) throw new InvalidOperationException("User not found.");
-
-                // Generate a secure reset token
-                string resetToken = Guid.NewGuid().ToString();
-                await _userRL.SavePasswordResetTokenAsync(user, resetToken);
-
-                // Normally, you'd send this token via email
-                _logger.LogInformation("Generated password reset token for user: {Email}", email);
-
-                return resetToken; // Return token for debugging (replace with email sending)
+                user = System.Text.Json.JsonSerializer.Deserialize<UserEntity>(cachedUser);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "Error occurred during password reset.");
-                throw new InvalidOperationException("Password reset failed.");
+                // Fetch from DB if not in cache
+                user = await _userRepository.GetUserByEmail(userloginDTO.Email);
+                if (user != null)
+                {
+                    await _cache.StringSetAsync(cacheKey, System.Text.Json.JsonSerializer.Serialize(user), _cacheExpiration);
+                }
             }
+
+            if (user == null || !PasswordHasher.VerifyPassword(userloginDTO.Password, user.PasswordHash))
+            {
+                return null; // Invalid credentials
+            }
+
+            return _jwtTokenGenerator.GenerateToken(user.Email);
         }
 
-        // Resets user password
-        public async Task<bool> ResetPasswordAsync(string resetToken, string newPassword)
+        public async Task<bool> ForgotPassword(ForgotPasswordDTO forgotPasswordDTO)
         {
-            if (string.IsNullOrEmpty(resetToken) || string.IsNullOrEmpty(newPassword))
-                throw new ArgumentNullException("Token and password cannot be null.");
+            string cacheKey = $"user:{forgotPasswordDTO.Email}";
 
-            try
+            // Try fetching from cache first
+            var cachedUser = await _cache.StringGetAsync(cacheKey);
+            UserEntity user;
+
+            if (!cachedUser.IsNullOrEmpty)
             {
-                var user = await _userRL.GetUserByResetTokenAsync(resetToken);
-                if (user == null || user.ResetTokenExpiry < DateTime.UtcNow) return false;
-
-                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-                user.ResetToken = null;
-                user.ResetTokenExpiry = null;
-
-                await _userRL.UpdateUserAsync(user);
-                return true;
+                user = System.Text.Json.JsonSerializer.Deserialize<UserEntity>(cachedUser);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "Error occurred during password reset.");
-                throw new InvalidOperationException("Password reset failed.");
+                user = await _userRepository.GetUserByEmail(forgotPasswordDTO.Email);
+                if (user == null) return false;
             }
+
+            user.ResetToken = Guid.NewGuid().ToString();
+            user.ResetTokenExpiry = DateTime.UtcNow.AddHours(2);
+
+            await _userRepository.UpdateUser(user);
+
+            // Update cache with new reset token
+            await _cache.StringSetAsync(cacheKey, System.Text.Json.JsonSerializer.Serialize(user), _cacheExpiration);
+
+            string resetLink = $"https://localhost:7135/api/auth/reset-password?token={user.ResetToken}";
+            string emailBody = $"Click <a href='{resetLink}'>here</a> to reset your password.";
+
+            await _emailService.SendEmailAsync(user.Email, "Password Reset", emailBody);
+
+            return true;
+        }
+
+        public async Task<bool> ResetPassword(ResetPasswordDTO resetPasswordDTO)
+        {
+            var user = await _userRepository.GetUserByResetToken(resetPasswordDTO.Token);
+            if (user == null || user.ResetTokenExpiry < DateTime.UtcNow) return false;
+
+            user.PasswordHash = PasswordHasher.HashPassword(resetPasswordDTO.NewPassword);
+            user.ResetToken = null;
+            user.ResetTokenExpiry = null;
+
+            await _userRepository.UpdateUser(user);
+
+            // Invalidate cache after password reset
+            await _cache.KeyDeleteAsync($"user:{user.Email}");
+
+            return true;
         }
     }
 }

@@ -1,58 +1,76 @@
-﻿using BusinessLayer.Interface;
-using BusinessLayer.Service;
+﻿using BussinessLayer.Interface;
 using Microsoft.AspNetCore.Mvc;
 using ModelLayer.DTO;
+using ModelLayer.Model;
 
-namespace PracticeWork.Controllers;
-
-[ApiController]
-[Route("api/auth")]
-public class AuthController : ControllerBase
+namespace AddressBookApp.Controllers
 {
-    private readonly IAuthBL _authBL;
-
-    public AuthController(IAuthBL authBL)
+    [Route("api/auth")]
+    [ApiController]
+    public class AuthController : Controller
     {
-        _authBL = authBL;
-    }
+        private readonly IAuthBL _userService;
 
-    [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] UserRegisterDTO registerDto)
-    {
-        var user = await _authBL.RegisterUserAsync(registerDto);
-        if (user == null) return BadRequest("User already exists.");
+        public AuthController(IAuthBL userService)
+        {
+            _userService = userService;
+        }
 
-        return Ok(new { Message = "User registered successfully." });
-    }
+        /// <summary>
+        /// This method is used to Register the User
+        /// </summary>
+        /// <param name="userregisterDTO"></param>
+        /// <returns></returns>
+        [HttpPost("register")]
+        public async Task<ActionResult<UserEntity>> Register([FromBody] UserRegisterDTO userregisterDTO)
+        {
+            var registeredUser = await _userService.Register(userregisterDTO);
+            return CreatedAtAction(nameof(Register), new { id = registeredUser.Id }, registeredUser);
+        }
 
-    [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] UserLoginDTO loginDto)
-    {
-        var token = await _authBL.LoginUserAsync(loginDto);
-        if (token == null) return Unauthorized("Invalid credentials.");
+        /// <summary>
+        /// This method is used to Login a User
+        /// </summary>
+        /// <param name="userloginDTO"></param>
+        /// <returns></returns>
+        [HttpPost("login")]
+        public async Task<ActionResult<string>> Login([FromBody] UserLoginDTO userloginDTO)
+        {
+            var token = await _userService.Login(userloginDTO);
+            if (token == null)
+            {
+                return Unauthorized("Invalid credentials");
+            }
 
-        return Ok(new { Token = token });
-    }
+            return Ok(new { Token = token });
+        }
 
-    // POST: /api/auth/forgot-password
-    [HttpPost("forgot-password")]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO model)
-    {
-        if (model == null || string.IsNullOrEmpty(model.Email))
-            return BadRequest("Email is required.");
+        /// <summary>
+        /// This method is used to Trigger Forget Password
+        /// </summary>
+        /// <param name="forgotPasswordDTO"></param>
+        /// <returns></returns>
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO forgotPasswordDTO)
+        {
+            var result = await _userService.ForgotPassword(forgotPasswordDTO);
+            if (!result) return NotFound("User not found.");
 
-        var result = await _authBL.ForgotPasswordAsync(model.Email);
-        return Ok(new { message = result });
-    }
+            return Ok("Password reset link has been sent to your email.");
+        }
 
-    // POST: /api/auth/reset-password
-    [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO model)
-    {
-        if (model == null || string.IsNullOrEmpty(model.Token) || string.IsNullOrEmpty(model.NewPassword))
-            return BadRequest("Token and new password are required.");
+        /// <summary>
+        /// This method is used to Reset the user's password
+        /// </summary>
+        /// <param name="resetPasswordDTO"></param>
+        /// <returns></returns>
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO resetPasswordDTO)
+        {
+            var result = await _userService.ResetPassword(resetPasswordDTO);
+            if (!result) return BadRequest("Invalid or expired reset token.");
 
-        var result = await _authBL.ResetPasswordAsync(model.Token, model.NewPassword);
-        return Ok(new { message = result });
+            return Ok("Password has been reset successfully.");
+        }
     }
 }

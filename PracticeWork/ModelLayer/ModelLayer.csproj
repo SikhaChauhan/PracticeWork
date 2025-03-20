@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -7,6 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    
+    <PackageReference Include="DataManagementSystem.EmailService" Version="1.1.4" />
     
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.36" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.36">
@@ -18,6 +20,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="TokenGenerator.Jwt" Version="1.0.2" />
   </ItemGroup>
 
 </Project>
