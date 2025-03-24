@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using ModelLayer.DTO;
 using ModelLayer.Model;
 
-namespace Prac.Controllers
+namespace PracticeWork.Controllers
 {
     [Route("api/auth")]
     [ApiController]
